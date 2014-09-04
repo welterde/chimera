@@ -21,8 +21,10 @@
 
 import math
 
+import ctypes
+
 import numpy
-import sbigudrv as udrv
+import sbigpy as udrv
 
 import logging
 #from chimera.util.dumper import dumpObj
@@ -46,11 +48,11 @@ class SBIGReadoutMode(ReadoutMode):
 
     def __init__(self, mode):
         self.mode =  mode.mode
-        self.gain = float(hex(mode.gain).split('x')[1]) / 100.0
+        self.gain = float(hex(int(mode.gain)).split('x')[1]) / 100.0
         self.width = mode.width
         self.height = mode.height
-        self.pixelWidth = float(hex(mode.pixel_width).split('x')[1]) / 100.0
-        self.pixelHeight = float(hex(mode.pixel_height).split('x')[1]) / 100.0
+        self.pixelWidth = float(hex(int(mode.pixel_width)).split('x')[1]) / 100.0
+        self.pixelHeight = float(hex(int(mode.pixel_height)).split('x')[1]) / 100.0
 
 
 class TemperatureSetPoint(object):
@@ -261,7 +263,7 @@ class SBIGDrv(object):
         erp.ccd = ccd
         return self._cmd(udrv.CC_END_READOUT, erp, None)
     
-    def readoutLine(self, ccd, mode = 0, line = None):
+    def readoutLine(self, ccd, mode = 0, line = None, buff=None, conv=True):
 
         if mode not in self.readoutModes[ccd].keys():
             raise ValueError("Invalid readout mode")
@@ -284,11 +286,14 @@ class SBIGDrv(object):
         rolp.pixelLength = line[1]
 
         # create a numpy array to hold the line
-        buff = numpy.zeros(line[1], numpy.uint16)
+        #buff = numpy.zeros(line[1], numpy.uint16)
+        if buff == None:
+            buff = udrv.intArray(line[1])
 
         self._cmd(udrv.CC_READOUT_LINE, rolp, buff)
 
-        return buff
+        if conv:
+            return numpy.fromstring(udrv.cdata(buff, line[1]), dtype=numpy.uint16)
 
     # query and info functions
 
