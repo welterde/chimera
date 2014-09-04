@@ -31,6 +31,11 @@ from chimera.interfaces.camera   import (CCD, CameraFeature, Shutter, CameraStat
 from chimera.instruments.camera      import CameraBase
 from chimera.instruments.filterwheel import FilterWheelBase
 
+try:
+    from chimera.instruments.rtd import RTD
+except ImportError:
+    pass
+
 from chimera.core.lock import lock
 
 
@@ -86,6 +91,14 @@ class SBIG(CameraBase, FilterWheelBase):
             self.ccd = SBIGDrv.tracking
 
         self.open(self.dev)
+
+        if 'RTD' in dir():
+            self.rtd = RTD(cam_name=str(self.ccd),
+                           width=self.drv.readoutModes[self.ccd][0].width,
+                           height=self.drv.readoutModes[self.ccd][0].height,
+                           datasize=16)
+        else:
+            self.rtd = None
 
         # make sure filter wheel is in the right position
         self.setFilter(self.getFilters()[0])
@@ -268,9 +281,18 @@ class SBIG(CameraBase, FilterWheelBase):
             if self.abort.isSet():
                 self._endReadout(None, CameraStatus.ABORTED)
                 return False
- 
-            img[line] = self.drv.readoutLine(self.ccd, mode.mode, (left, width))
 
+            if self.rtd:
+                buff = self.rtd.get_buffer(line*width)
+                self.drv.readoutLine(self.ccd, mode.mode, (left, width), buff=buff, conv=False)
+            else:
+                img[line] = self.drv.readoutLine(self.ccd, mode.mode, (left, width), conv=True)
+            
+            if self.rtd and line % 3 == 0:
+                self.rtd.fill_next()
+
+        if self.rtd:
+            img = self.rtd.get_data(width, height)
 
         proxy = self._saveImage(imageRequest, img,
                                 {"frame_temperature": self.lastFrameTemp,
