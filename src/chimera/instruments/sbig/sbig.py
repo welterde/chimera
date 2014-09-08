@@ -33,8 +33,9 @@ from chimera.instruments.filterwheel import FilterWheelBase
 
 try:
     from chimera.instruments.rtd import RTD
+    has_rtd = True
 except ImportError:
-    pass
+    has_rtd = False
 
 from chimera.core.lock import lock
 
@@ -92,7 +93,7 @@ class SBIG(CameraBase, FilterWheelBase):
 
         self.open(self.dev)
 
-        if 'RTD' in dir():
+        if has_rtd:
             self.rtd = RTD(cam_name=str(self.ccd),
                            width=self.drv.readoutModes[self.ccd][0].width,
                            height=self.drv.readoutModes[self.ccd][0].height,
@@ -277,18 +278,17 @@ class SBIG(CameraBase, FilterWheelBase):
         self.drv.startReadout(self.ccd, mode.mode, (top, left, width, height))
         
         for line in range(height):
+            #print line
             # [ABORT POINT]
             if self.abort.isSet():
                 self._endReadout(None, CameraStatus.ABORTED)
                 return False
 
             if self.rtd:
-                buff = self.rtd.get_buffer(line*width)
-                self.drv.readoutLine(self.ccd, mode.mode, (left, width), buff=buff, conv=False)
+                self.drv.readoutLine(self.ccd, mode.mode, (left, width), buff=self.rtd.buffer, conv=False, offset=line*2*width)
             else:
                 img[line] = self.drv.readoutLine(self.ccd, mode.mode, (left, width), conv=True)
-            
-            if self.rtd and line % 3 == 0:
+            if self.rtd and line % 15 == 0:
                 self.rtd.fill_next()
 
         if self.rtd:

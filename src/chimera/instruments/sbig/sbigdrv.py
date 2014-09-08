@@ -263,7 +263,7 @@ class SBIGDrv(object):
         erp.ccd = ccd
         return self._cmd(udrv.CC_END_READOUT, erp, None)
     
-    def readoutLine(self, ccd, mode = 0, line = None, buff=None, conv=True):
+    def readoutLine(self, ccd, mode = 0, line = None, buff=None, conv=True, offset=0):
 
         if mode not in self.readoutModes[ccd].keys():
             raise ValueError("Invalid readout mode")
@@ -290,10 +290,11 @@ class SBIGDrv(object):
         if buff == None:
             buff = udrv.intArray(line[1])
 
-        self._cmd(udrv.CC_READOUT_LINE, rolp, buff)
+        #self._cmd(udrv.CC_READOUT_LINE, rolp, buff)
+        udrv.readoutLine(rolp, buff, offset)
 
         if conv:
-            return numpy.fromstring(udrv.cdata(buff, line[1]), dtype=numpy.uint16)
+            return numpy.fromstring(udrv.cdata(buff, line[1]*2), dtype=numpy.uint16)
 
     # query and info functions
 
